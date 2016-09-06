@@ -35,7 +35,7 @@ def new_task(offer):
     task = mesos_pb2.TaskInfo()
     task.task_id.value = str(uuid.uuid4())
     task.slave_id.value = offer.slave_id.value
-    task.name = "HelloWorld"
+    task.name = "packetbeat-agent"
 
     cpus = task.resources.add()
     cpus.name = "cpus"
@@ -69,13 +69,13 @@ class VizCeralScheduler(Scheduler):
     master_status={}
 
     def is_running_on_agent(self,slave_id,taskname=None):
-
+        logging.info("NR TASKS %d",len(self.RUNNING_TASKS))
         for task in self.RUNNING_TASKS:
-            #print str(task['slave_id'])+" vs "+slave_id
-            if task['slave_id']== slave_id:
+            #logging.info("Task slave: %s vs slave_id: %s", task['slave_id'], slave_id)
+            if task['slave_id'] == slave_id:
                 return True
-            else:
-                return False
+
+        return False
 
     def remove_from_running_list(self,slave_id):
         for task in self.RUNNING_TASKS:
@@ -87,8 +87,9 @@ class VizCeralScheduler(Scheduler):
         local_running_tasks=[]
         if 'frameworks' in self.master_status:
             for framework in self.master_status['frameworks']:
-                for task in framework['tasks']:
-                    local_running_tasks.append(get_task_log_param(task['name'],task['slave_id']))
+                if framework['name'] == 'vizceral':
+                    for task in framework['tasks']:
+                        local_running_tasks.append(get_task_log_param(task['name'],task['slave_id']))
 
         self.RUNNING_TASKS = local_running_tasks
 
@@ -112,7 +113,9 @@ class VizCeralScheduler(Scheduler):
         for offer in offers:
             task = new_task(offer)
             task.command.value = "echo hello world && sleep 120"
-            time.sleep(5)
+            logging.info("OFFER STATUS:  %s  %s ",
+                         offer.slave_id,
+                         offer.hostname)
             if self.is_running_on_agent(offer.slave_id):
 
                 logging.info("declining task since it's allready in %s "
@@ -120,6 +123,7 @@ class VizCeralScheduler(Scheduler):
                              task.task_id.value,
                              offer.id.value)
                 driver.declineOffer(offer.id)
+                #driver.decline_offer(offer.id)
             else:
 
                 #self.TASKS.append()
@@ -127,11 +131,17 @@ class VizCeralScheduler(Scheduler):
                          "using offer %s.",
                          task.task_id.value,
                          offer.id.value)
-                #driver.declineOffer(offer.id)
-                print offer.hostname
+                
                 driver.launchTasks(offer.id, [task])
+                #driver.declineOffer(offer.id)
+
 
                 self.RUNNING_TASKS.append(get_task_log(offer,task))
+
+        #print(self.RUNNING_TASKS)
+
+
+
 
     def statusUpdate(self, driver, update):
         '''
@@ -154,6 +164,7 @@ class VizCeralScheduler(Scheduler):
 
 if __name__ == '__main__':
     ZK_HOSTS='zk://172.17.0.4:2181/mesos'
+    ZK_HOSTS = 'zk://10.0.0.136:2181/mesos'
 
     zk_discovery = zookeeper_discovery('1.0.0', ZK_HOSTS, timeout_sec=15)
     logging.info("Connected")
@@ -179,7 +190,7 @@ if __name__ == '__main__':
     framework = mesos_pb2.FrameworkInfo()
     framework.user = "root"  # Have Mesos fill in the current user.
     framework.name = "vizceral"
-    framework.failover_timeout=60
+    framework.failover_timeout=300
 
     #print framework
 
