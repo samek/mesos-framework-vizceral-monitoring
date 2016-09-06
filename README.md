@@ -1,7 +1,7 @@
 # mesos-framework-vizceral-monitoring
 
-requirements:
-mesos CNI (ip per container)
-elasticsearch cluster
+*requirements:
+- mesos CNI (ip per container) / overlay network
+- elasticsearch cluster
 
 ## NOT WORKING AT ALL YET!!
